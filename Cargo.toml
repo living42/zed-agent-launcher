@@ -1,0 +1,8 @@
+[package]
+name = "zed-agent-launcher"
+version = "0.1.0"
+edition = "2021"
+description = "Interactive CLI launcher for Zed Terminal Threads init command"
+
+[dependencies]
+cursive = { version = "0.20", default-features = false, features = ["crossterm-backend"] }
