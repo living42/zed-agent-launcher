@@ -4,11 +4,19 @@ use cursive::views::{Dialog, DummyView, LinearLayout, SelectView, TextView};
 use std::cell::RefCell;
 use std::env;
 use std::fs;
+use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 use std::rc::Rc;
+
+/// Set terminal window title using OSC 0 control sequence
+/// // OSC 0;title BEL - set terminal window title
+fn set_terminal_title(title: &str) {
+    print!("\x1b]0;{}\x07", title);
+    let _ = io::stdout().flush();
+}
 
 #[derive(Debug, Clone)]
 struct AgentChoice {
@@ -115,6 +123,8 @@ fn select_agent(available_choices: Vec<AgentChoice>) -> Option<AgentChoice> {
 }
 
 fn main() {
+    set_terminal_title("zed-agent-launcher");
+
     let choices = vec![
         AgentChoice {
             name: "pi",
@@ -169,6 +179,7 @@ fn main() {
     match selection {
         Some(choice) => {
             save_recent_choice(choice.executable);
+            set_terminal_title(choice.name);
 
             println!("Launching {} ({}) ...", choice.name, choice.executable);
 
