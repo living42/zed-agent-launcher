@@ -20,9 +20,9 @@ fn set_terminal_title(title: &str) {
 
 #[derive(Debug, Clone)]
 struct AgentChoice {
-    name: &'static str,
-    executable: &'static str,
-    description: &'static str,
+    name: String,
+    executable: String,
+    description: String,
 }
 
 fn get_history_file_path() -> Option<PathBuf> {
@@ -57,17 +57,28 @@ fn save_recent_choice(executable: &str) {
     }
 }
 
-/// Checks if an executable binary exists and has execute permissions in PATH
+/// Helper to check if a path points to an executable file
+fn is_executable(path: &std::path::Path) -> bool {
+    if path.is_file() {
+        if let Ok(metadata) = path.metadata() {
+            return metadata.permissions().mode() & 0o111 != 0;
+        }
+    }
+    false
+}
+
+/// Checks if an executable binary exists and has execute permissions in PATH or at absolute path
 fn is_in_path(executable: &str) -> bool {
+    let exec_path = std::path::Path::new(executable);
+    if exec_path.is_absolute() {
+        return is_executable(exec_path);
+    }
+
     if let Some(path_var) = env::var_os("PATH") {
         for path in env::split_paths(&path_var) {
             let full_path = path.join(executable);
-            if full_path.is_file() {
-                if let Ok(metadata) = full_path.metadata() {
-                    if metadata.permissions().mode() & 0o111 != 0 {
-                        return true;
-                    }
-                }
+            if is_executable(&full_path) {
+                return true;
             }
         }
     }
@@ -125,40 +136,50 @@ fn select_agent(available_choices: Vec<AgentChoice>) -> Option<AgentChoice> {
 fn main() {
     set_terminal_title("zed-agent-launcher");
 
+    let shell_path = env::var("SHELL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "/bin/sh".to_string());
+
     let choices = vec![
         AgentChoice {
-            name: "pi",
-            executable: "pi",
-            description: "pi-coding-agent",
+            name: "shell".to_string(),
+            executable: shell_path.clone(),
+            description: format!("System Shell ({})", shell_path),
         },
         AgentChoice {
-            name: "agy",
-            executable: "agy",
-            description: "Google Antigravity",
+            name: "pi".to_string(),
+            executable: "pi".to_string(),
+            description: "pi-coding-agent".to_string(),
         },
         AgentChoice {
-            name: "codex",
-            executable: "codex",
-            description: "OpenAI Codex",
+            name: "agy".to_string(),
+            executable: "agy".to_string(),
+            description: "Google Antigravity".to_string(),
         },
         AgentChoice {
-            name: "opencode",
-            executable: "opencode",
-            description: "OpenCode",
+            name: "codex".to_string(),
+            executable: "codex".to_string(),
+            description: "OpenAI Codex".to_string(),
+        },
+        AgentChoice {
+            name: "opencode".to_string(),
+            executable: "opencode".to_string(),
+            description: "OpenCode".to_string(),
         },
     ];
 
     let mut available_choices: Vec<AgentChoice> = choices
         .into_iter()
-        .filter(|choice| is_in_path(choice.executable))
+        .filter(|choice| is_in_path(&choice.executable))
         .collect();
 
     if available_choices.is_empty() {
         eprintln!(
-            "✖ Error: None of the supported coding agents (pi, agy, codex, opencode) were found in your PATH."
+            "✖ Error: None of the supported choices (shell, pi, agy, codex, opencode) were found."
         );
         eprintln!(
-            "Please verify that at least one agent is installed and available in your system PATH."
+            "Please verify that at least one agent or shell is available."
         );
         std::process::exit(1);
     }
@@ -168,7 +189,7 @@ fn main() {
     available_choices.sort_by_key(|choice| {
         history
             .iter()
-            .position(|item| item == choice.executable)
+            .position(|item| item == &choice.executable || item == &choice.name)
             .unwrap_or(usize::MAX)
     });
 
@@ -178,12 +199,12 @@ fn main() {
 
     match selection {
         Some(choice) => {
-            save_recent_choice(choice.executable);
-            set_terminal_title(choice.name);
+            save_recent_choice(&choice.executable);
+            set_terminal_title(&choice.name);
 
             println!("Launching {} ({}) ...", choice.name, choice.executable);
 
-            let mut cmd = Command::new(choice.executable);
+            let mut cmd = Command::new(&choice.executable);
             cmd.args(&forwarded_args);
 
             // exec replaces the current process image with the selected agent executable
@@ -201,3 +222,26 @@ fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_in_path_absolute_and_binary() {
+        assert!(is_in_path("/bin/sh") || is_in_path("/usr/bin/sh"));
+        assert!(is_in_path("sh"));
+        assert!(!is_in_path("/nonexistent_path_to_binary_12345"));
+    }
+
+    #[test]
+    fn test_shell_resolution_fallback() {
+        let shell_path = env::var("SHELL")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| "/bin/sh".to_string());
+        assert!(!shell_path.is_empty());
+        assert!(is_in_path(&shell_path));
+    }
+}
+

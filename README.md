@@ -2,7 +2,7 @@
 
 An interactive CLI launcher designed as a helper for **Zed Editor**'s Terminal Threads init command (`terminal_init_command`).
 
-When launching a new terminal thread in Zed, `zed-agent-launcher` presents an interactive menu to select your desired AI coding agent (`pi`, `Google Antigravity (agy)`, `OpenAI Codex`, `OpenCode`).
+When launching a new terminal thread in Zed, `zed-agent-launcher` presents an interactive menu to select your desired AI coding agent (`pi`, `Google Antigravity (agy)`, `OpenAI Codex`, `OpenCode`) or open a system `shell` session.
 
 ---
 
